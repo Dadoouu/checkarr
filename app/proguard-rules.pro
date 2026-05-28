@@ -1,0 +1,4 @@
+-keep class com.ruddarr.data.models.** { *; }
+-keepclassmembers class com.ruddarr.data.models.** { *; }
+-dontwarn okhttp3.**
+-keep class okhttp3.** { *; }
