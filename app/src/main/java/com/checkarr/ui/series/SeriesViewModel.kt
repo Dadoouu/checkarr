@@ -176,6 +176,118 @@ class SeriesViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun refreshSeries(instance: Instance, seriesId: Int) {
+        viewModelScope.launch {
+            repo.refreshSeries(instance, seriesId).fold(
+                onSuccess = { _toast.value = "Refresh started" },
+                onFailure = { _error.value = it.message }
+            )
+        }
+    }
+
+    fun rescanSeries(instance: Instance, seriesId: Int) {
+        viewModelScope.launch {
+            repo.rescanSeries(instance, seriesId).fold(
+                onSuccess = { _toast.value = "Rescan started" },
+                onFailure = { _error.value = it.message }
+            )
+        }
+    }
+
+    fun renameSeries(instance: Instance, seriesId: Int) {
+        viewModelScope.launch {
+            repo.renameSeries(instance, seriesId).fold(
+                onSuccess = { _toast.value = "Rename started" },
+                onFailure = { _error.value = it.message }
+            )
+        }
+    }
+
+    fun monitorSeason(instance: Instance, series: Series, seasonNumber: Int, monitored: Boolean) {
+        viewModelScope.launch {
+            repo.monitorSeason(instance, series, seasonNumber, monitored).fold(
+                onSuccess = {
+                    val list = _series.value.toMutableList()
+                    val idx = list.indexOfFirst { s -> s.id == series.id }
+                    if (idx >= 0) list[idx] = it
+                    _series.value = list
+                    _toast.value = if (monitored) "Season monitored" else "Season unmonitored"
+                },
+                onFailure = { _error.value = it.message }
+            )
+        }
+    }
+
+    fun toggleEpisodeMonitor(instance: Instance, episode: Episode) {
+        viewModelScope.launch {
+            repo.toggleEpisodeMonitor(instance, episode).fold(
+                onSuccess = {
+                    val list = _episodes.value.toMutableList()
+                    val idx = list.indexOfFirst { e -> e.id == episode.id }
+                    if (idx >= 0) list[idx] = it
+                    _episodes.value = list
+                    _toast.value = if (it.monitored) "Episode monitored" else "Episode unmonitored"
+                },
+                onFailure = { _error.value = it.message }
+            )
+        }
+    }
+
+    fun searchSeasonEpisodes(instance: Instance, seriesId: Int, seasonNumber: Int) {
+        viewModelScope.launch {
+            repo.searchSeasonEpisodes(instance, seriesId, seasonNumber).fold(
+                onSuccess = { _toast.value = "Season search started" },
+                onFailure = { _error.value = it.message }
+            )
+        }
+    }
+
+    private val _episodeReleases = MutableStateFlow<List<MovieRelease>>(emptyList())
+    private val _isLoadingEpisodeReleases = MutableStateFlow(false)
+    val episodeReleases: StateFlow<List<MovieRelease>> = _episodeReleases
+    val isLoadingEpisodeReleases: StateFlow<Boolean> = _isLoadingEpisodeReleases
+
+    fun loadEpisodeReleases(instance: Instance, episodeId: Int) {
+        viewModelScope.launch {
+            _isLoadingEpisodeReleases.value = true
+            repo.getEpisodeReleases(instance, episodeId).fold(
+                onSuccess = { _episodeReleases.value = it.sortedByDescending { r -> !r.rejected } },
+                onFailure = { _error.value = it.message }
+            )
+            _isLoadingEpisodeReleases.value = false
+        }
+    }
+
+    fun downloadEpisodeRelease(instance: Instance, release: MovieRelease) {
+        viewModelScope.launch {
+            repo.downloadEpisodeRelease(instance, release.guid, 0).fold(
+                onSuccess = { _toast.value = "Added to queue" },
+                onFailure = { _error.value = it.message }
+            )
+        }
+    }
+
+    fun editSeries(instance: Instance, series: Series, qualityProfileId: Int, rootFolderPath: String, monitored: Boolean, seriesType: String) {
+        viewModelScope.launch {
+            val updated = series.copy(
+                qualityProfileId = qualityProfileId,
+                rootFolderPath = rootFolderPath,
+                monitored = monitored,
+                seriesType = seriesType
+            )
+            repo.updateSeries(instance, updated).fold(
+                onSuccess = {
+                    val list = _series.value.toMutableList()
+                    val idx = list.indexOfFirst { s -> s.id == series.id }
+                    if (idx >= 0) list[idx] = it
+                    _series.value = list
+                    _toast.value = "Series updated"
+                },
+                onFailure = { _error.value = it.message }
+            )
+        }
+    }
+
     fun setSearch(query: String) { _searchQuery.value = query }
     fun setSort(sort: SeriesSortOption) {
         if (_sortOption.value == sort) _sortAscending.value = !_sortAscending.value

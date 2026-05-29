@@ -184,10 +184,6 @@ fun ServiceConfigCard(serviceType: ServiceType, config: ServiceConfig, onConfigC
                             singleLine = true
                         )
                     }
-                    ServiceType.MAINTAINERR -> {
-                        // Maintainerr n'a pas de clé API, accès direct
-                        Text("Maintainerr ne nécessite pas de clé API.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
                     else -> {
                         OutlinedTextField(
                             value = config.apiKey,

@@ -27,8 +27,14 @@ import com.checkarr.ui.dashboard.DashboardScreen
 import com.checkarr.ui.dashboard.DashboardViewModel
 import com.checkarr.ui.jellyfin.JellyfinScreen
 import com.checkarr.ui.jellyfin.JellyfinViewModel
+import com.checkarr.ui.maintainerr.MaintainerrScreen
+import com.checkarr.ui.maintainerr.MaintainerrViewModel
 import com.checkarr.ui.movies.*
+import com.checkarr.ui.prowlarr.ProwlarrScreen
+import com.checkarr.ui.prowlarr.ProwlarrViewModel
 import com.checkarr.ui.qbittorrent.QBittorrentScreen
+import com.checkarr.ui.seerr.SeerrScreen
+import com.checkarr.ui.seerr.SeerrViewModel
 import com.checkarr.ui.series.*
 import com.checkarr.ui.settings.*
 import kotlinx.coroutines.launch
@@ -75,6 +81,9 @@ fun RuddarrApp(viewModel: MainViewModel = viewModel()) {
     val seriesViewModel: SeriesViewModel = viewModel()
     val jellyfinViewModel: JellyfinViewModel = viewModel()
     val dashboardViewModel: DashboardViewModel = viewModel()
+    val prowlarrViewModel: ProwlarrViewModel = viewModel()
+    val seerrViewModel: SeerrViewModel = viewModel()
+    val maintainerrViewModel: MaintainerrViewModel = viewModel()
 
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -139,6 +148,10 @@ fun RuddarrApp(viewModel: MainViewModel = viewModel()) {
                     val sn = back.arguments?.getString("seasonNumber")?.toIntOrNull() ?: return@composable
                     SeasonDetailScreen(seriesId = sid, seasonNumber = sn, instance = sonarrInstance, navController = navController, viewModel = seriesViewModel)
                 }
+                composable(Screen.EpisodeReleases.route) { back ->
+                    val id = back.arguments?.getString("episodeId")?.toIntOrNull() ?: return@composable
+                    EpisodeReleasesScreen(episodeId = id, instance = sonarrInstance, navController = navController, viewModel = seriesViewModel)
+                }
                 composable(Screen.Calendar.route) {
                     CalendarScreen(radarrInstance = radarrInstance, sonarrInstance = sonarrInstance, navController = navController)
                 }
@@ -152,13 +165,27 @@ fun RuddarrApp(viewModel: MainViewModel = viewModel()) {
                     JellyfinScreen(instance = jellyfinInstance, navController = navController, viewModel = jellyfinViewModel)
                 }
                 composable(Screen.Prowlarr.route) {
-                    PlaceholderScreen("Prowlarr", Icons.Default.ManageSearch, Color(0xFFFF6B35))
+                    val prowlarrConfig = appConfig.serviceConfigs[ServiceType.PROWLARR.name]
+                    val prowlarrInstance = prowlarrConfig
+                        ?.takeIf { it.enabled && it.url.isNotBlank() && it.apiKey.isNotBlank() }
+                        ?.let { Instance(type = InstanceType.PROWLARR, label = "Prowlarr", url = it.url, apiKey = it.apiKey) }
+                    ProwlarrScreen(instance = prowlarrInstance, viewModel = prowlarrViewModel)
                 }
                 composable(Screen.Seerr.route) {
-                    PlaceholderScreen("Seerr", Icons.Default.VideoCall, Color(0xFF7C3AED))
+                    val seerrConfig = appConfig.serviceConfigs[ServiceType.SEERR.name]
+                    SeerrScreen(
+                        url = seerrConfig?.url?.takeIf { it.isNotBlank() },
+                        apiKey = seerrConfig?.apiKey?.takeIf { it.isNotBlank() },
+                        viewModel = seerrViewModel
+                    )
                 }
                 composable(Screen.Maintainerr.route) {
-                    PlaceholderScreen("Maintainerr", Icons.Default.CleaningServices, Color(0xFFEC4899))
+                    val mtConfig = appConfig.serviceConfigs[ServiceType.MAINTAINERR.name]
+                    MaintainerrScreen(
+                        url = mtConfig?.url?.takeIf { it.isNotBlank() },
+                        apiKey = mtConfig?.apiKey?.takeIf { it.isNotBlank() },
+                        viewModel = maintainerrViewModel
+                    )
                 }
                 composable(Screen.Settings.route) {
                     SettingsScreen(navController = navController, viewModel = viewModel)

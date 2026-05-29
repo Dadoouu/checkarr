@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -22,6 +23,8 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.checkarr.data.models.Instance
 import com.checkarr.data.models.Movie
+import com.checkarr.data.models.QualityProfile
+import com.checkarr.data.models.RootFolder
 import com.checkarr.navigation.Screen
 import com.checkarr.ui.shared.*
 
@@ -36,10 +39,17 @@ fun MovieDetailScreen(
     val movies by viewModel.movies.collectAsState()
     val toast by viewModel.toast.collectAsState()
     val error by viewModel.error.collectAsState()
+    val qualityProfiles by viewModel.qualityProfiles.collectAsState()
+    val rootFolders by viewModel.rootFolders.collectAsState()
 
     val movie = movies.firstOrNull { it.id == movieId }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var deleteFiles by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(instance) {
+        instance?.let { viewModel.loadMetadata(it) }
+    }
 
     LaunchedEffect(toast) {
         if (toast != null) {
@@ -77,13 +87,36 @@ fun MovieDetailScreen(
                                 }
                                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                                     DropdownMenuItem(
-                                        text = { Text("View Releases") },
-                                        leadingIcon = { Icon(Icons.Default.Download, contentDescription = null) },
+                                        text = { Text("Interactive Search") },
+                                        leadingIcon = { Icon(Icons.Default.ManageSearch, contentDescription = null) },
                                         onClick = {
                                             showMenu = false
                                             navController.navigate(Screen.MovieReleases.createRoute(m.id))
                                         }
                                     )
+                                    DropdownMenuItem(
+                                        text = { Text("Edit Movie") },
+                                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                        onClick = { showMenu = false; showEditDialog = true }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Refresh & Scan") },
+                                        leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) },
+                                        onClick = { showMenu = false; viewModel.refreshMovie(inst, m.id) }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Rescan Files") },
+                                        leadingIcon = { Icon(Icons.Default.FolderOpen, contentDescription = null) },
+                                        onClick = { showMenu = false; viewModel.rescanMovie(inst, m.id) }
+                                    )
+                                    if (m.hasFile) {
+                                        DropdownMenuItem(
+                                            text = { Text("Rename Files") },
+                                            leadingIcon = { Icon(Icons.Default.DriveFileRenameOutline, contentDescription = null) },
+                                            onClick = { showMenu = false; viewModel.renameMovieFiles(inst, m.id) }
+                                        )
+                                    }
+                                    HorizontalDivider()
                                     DropdownMenuItem(
                                         text = { Text("Delete Movie") },
                                         leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
@@ -158,6 +191,87 @@ fun MovieDetailScreen(
             }
         )
     }
+
+    if (showEditDialog && movie != null && instance != null) {
+        MovieEditDialog(
+            movie = movie,
+            qualityProfiles = qualityProfiles,
+            rootFolders = rootFolders,
+            onDismiss = { showEditDialog = false },
+            onSave = { qpId, rfPath, monitored ->
+                viewModel.editMovie(instance, movie, qpId, rfPath, monitored, movie.minimumAvailability ?: "announced")
+                showEditDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun MovieEditDialog(
+    movie: Movie,
+    qualityProfiles: List<QualityProfile>,
+    rootFolders: List<RootFolder>,
+    onDismiss: () -> Unit,
+    onSave: (Int, String, Boolean) -> Unit
+) {
+    var selectedQualityProfileId by remember { mutableStateOf(movie.qualityProfileId) }
+    var selectedRootFolder by remember { mutableStateOf(movie.rootFolderPath ?: rootFolders.firstOrNull()?.path ?: "") }
+    var monitored by remember { mutableStateOf(movie.monitored) }
+    var showQpDropdown by remember { mutableStateOf(false) }
+    var showRfDropdown by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Movie") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Quality Profile
+                Text("Quality Profile", style = MaterialTheme.typography.labelMedium)
+                Box {
+                    OutlinedButton(onClick = { showQpDropdown = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(qualityProfiles.firstOrNull { it.id == selectedQualityProfileId }?.name ?: "Select…")
+                    }
+                    DropdownMenu(expanded = showQpDropdown, onDismissRequest = { showQpDropdown = false }) {
+                        qualityProfiles.forEach { qp ->
+                            DropdownMenuItem(
+                                text = { Text(qp.name) },
+                                onClick = { selectedQualityProfileId = qp.id; showQpDropdown = false }
+                            )
+                        }
+                    }
+                }
+                // Root Folder
+                Text("Root Folder", style = MaterialTheme.typography.labelMedium)
+                Box {
+                    OutlinedButton(onClick = { showRfDropdown = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(selectedRootFolder.ifBlank { "Select…" }, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    DropdownMenu(expanded = showRfDropdown, onDismissRequest = { showRfDropdown = false }) {
+                        rootFolders.forEach { rf ->
+                            DropdownMenuItem(
+                                text = { Text(rf.path) },
+                                onClick = { selectedRootFolder = rf.path; showRfDropdown = false }
+                            )
+                        }
+                    }
+                }
+                // Monitored
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = monitored, onCheckedChange = { monitored = it })
+                    Spacer(Modifier.width(8.dp))
+                    Text("Monitored")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(selectedQualityProfileId, selectedRootFolder, monitored) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable

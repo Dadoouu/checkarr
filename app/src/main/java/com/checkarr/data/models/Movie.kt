@@ -33,7 +33,8 @@ data class Movie(
     val certification: String? = null,
     val added: String = "",
     val tags: List<Int> = emptyList(),
-    val popularity: Double = 0.0
+    val popularity: Double = 0.0,
+    val minimumAvailability: String? = null
 ) {
     val remotePoster: String? get() = images.firstOrNull { it.coverType == "poster" }?.remoteUrl
     val remoteFanart: String? get() = images.firstOrNull { it.coverType == "fanart" }?.remoteUrl

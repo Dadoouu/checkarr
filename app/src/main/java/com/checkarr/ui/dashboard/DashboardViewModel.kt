@@ -125,7 +125,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             val seerrConfig = appConfig.serviceConfigs[ServiceType.SEERR.name]
             if (seerrConfig?.enabled == true && seerrConfig.url.isNotBlank() && seerrConfig.apiKey.isNotBlank()) {
                 launch {
-                    seerrRepo.getPendingRequests(seerrConfig.url, seerrConfig.apiKey).onSuccess {
+                    seerrRepo.getRequests(seerrConfig.url, seerrConfig.apiKey, filter = "pending").onSuccess {
                         _state.value = _state.value.copy(pendingRequests = it.results)
                     }
                 }

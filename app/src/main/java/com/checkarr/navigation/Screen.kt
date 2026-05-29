@@ -25,6 +25,9 @@ sealed class Screen(val route: String) {
     object SeasonDetail : Screen("series/{seriesId}/season/{seasonNumber}") {
         fun createRoute(seriesId: Int, seasonNumber: Int) = "series/$seriesId/season/$seasonNumber"
     }
+    object EpisodeReleases : Screen("episode/{episodeId}/releases") {
+        fun createRoute(episodeId: Int) = "episode/$episodeId/releases"
+    }
 
     object Jellyfin : Screen("jellyfin")
     object QBittorrent : Screen("qbittorrent")

@@ -37,10 +37,17 @@ fun SeriesDetailScreen(
     val allSeries by viewModel.series.collectAsState()
     val toast by viewModel.toast.collectAsState()
     val error by viewModel.error.collectAsState()
+    val qualityProfiles by viewModel.qualityProfiles.collectAsState()
+    val rootFolders by viewModel.rootFolders.collectAsState()
 
     val series = allSeries.firstOrNull { it.id == seriesId }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var deleteFiles by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(instance) {
+        instance?.let { viewModel.loadMetadata(it) }
+    }
 
     LaunchedEffect(toast) {
         if (toast != null) {
@@ -77,6 +84,27 @@ fun SeriesDetailScreen(
                                     Icon(Icons.Default.MoreVert, contentDescription = "More")
                                 }
                                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                                    DropdownMenuItem(
+                                        text = { Text("Edit Series") },
+                                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                        onClick = { showMenu = false; showEditDialog = true }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Refresh & Scan") },
+                                        leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) },
+                                        onClick = { showMenu = false; viewModel.refreshSeries(inst, s.id) }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Rescan Files") },
+                                        leadingIcon = { Icon(Icons.Default.FolderOpen, contentDescription = null) },
+                                        onClick = { showMenu = false; viewModel.rescanSeries(inst, s.id) }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Rename Files") },
+                                        leadingIcon = { Icon(Icons.Default.DriveFileRenameOutline, contentDescription = null) },
+                                        onClick = { showMenu = false; viewModel.renameSeries(inst, s.id) }
+                                    )
+                                    HorizontalDivider()
                                     DropdownMenuItem(
                                         text = { Text("Delete Series") },
                                         leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
@@ -153,6 +181,90 @@ fun SeriesDetailScreen(
             }
         )
     }
+
+    if (showEditDialog && series != null && instance != null) {
+        SeriesEditDialog(
+            series = series,
+            qualityProfiles = qualityProfiles,
+            rootFolders = rootFolders,
+            onDismiss = { showEditDialog = false },
+            onSave = { qpId, rfPath, monitored, seriesType ->
+                viewModel.editSeries(instance, series, qpId, rfPath, monitored, seriesType)
+                showEditDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun SeriesEditDialog(
+    series: Series,
+    qualityProfiles: List<QualityProfile>,
+    rootFolders: List<RootFolder>,
+    onDismiss: () -> Unit,
+    onSave: (Int, String, Boolean, String) -> Unit
+) {
+    var selectedQpId by remember { mutableStateOf(series.qualityProfileId) }
+    var selectedRf by remember { mutableStateOf(series.rootFolderPath ?: rootFolders.firstOrNull()?.path ?: "") }
+    var monitored by remember { mutableStateOf(series.monitored) }
+    var seriesType by remember { mutableStateOf(series.seriesType) }
+    var showQpDropdown by remember { mutableStateOf(false) }
+    var showRfDropdown by remember { mutableStateOf(false) }
+    var showTypeDropdown by remember { mutableStateOf(false) }
+    val types = listOf("standard", "daily", "anime")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Series") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Quality Profile", style = MaterialTheme.typography.labelMedium)
+                Box {
+                    OutlinedButton(onClick = { showQpDropdown = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(qualityProfiles.firstOrNull { it.id == selectedQpId }?.name ?: "Select…")
+                    }
+                    DropdownMenu(expanded = showQpDropdown, onDismissRequest = { showQpDropdown = false }) {
+                        qualityProfiles.forEach { qp ->
+                            DropdownMenuItem(text = { Text(qp.name) }, onClick = { selectedQpId = qp.id; showQpDropdown = false })
+                        }
+                    }
+                }
+                Text("Root Folder", style = MaterialTheme.typography.labelMedium)
+                Box {
+                    OutlinedButton(onClick = { showRfDropdown = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(selectedRf.ifBlank { "Select…" }, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    DropdownMenu(expanded = showRfDropdown, onDismissRequest = { showRfDropdown = false }) {
+                        rootFolders.forEach { rf ->
+                            DropdownMenuItem(text = { Text(rf.path) }, onClick = { selectedRf = rf.path; showRfDropdown = false })
+                        }
+                    }
+                }
+                Text("Series Type", style = MaterialTheme.typography.labelMedium)
+                Box {
+                    OutlinedButton(onClick = { showTypeDropdown = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(seriesType.replaceFirstChar { it.uppercase() })
+                    }
+                    DropdownMenu(expanded = showTypeDropdown, onDismissRequest = { showTypeDropdown = false }) {
+                        types.forEach { t ->
+                            DropdownMenuItem(text = { Text(t.replaceFirstChar { it.uppercase() }) }, onClick = { seriesType = t; showTypeDropdown = false })
+                        }
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = monitored, onCheckedChange = { monitored = it })
+                    Spacer(Modifier.width(8.dp))
+                    Text("Monitored")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(selectedQpId, selectedRf, monitored, seriesType) }) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable
@@ -305,6 +417,9 @@ fun SeasonDetailScreen(
     val episodes by viewModel.episodes.collectAsState()
     val isLoading by viewModel.isLoadingEpisodes.collectAsState()
     val toast by viewModel.toast.collectAsState()
+    val allSeries by viewModel.series.collectAsState()
+    val series = allSeries.firstOrNull { it.id == seriesId }
+    val currentSeason = series?.seasons?.firstOrNull { it.seasonNumber == seasonNumber }
 
     LaunchedEffect(seriesId, seasonNumber, instance) {
         instance?.let { viewModel.loadEpisodes(it, seriesId, seasonNumber) }
@@ -323,9 +438,21 @@ fun SeasonDetailScreen(
                 },
                 actions = {
                     instance?.let { inst ->
+                        series?.let { s ->
+                            currentSeason?.let { season ->
+                                IconButton(onClick = {
+                                    viewModel.monitorSeason(inst, s, seasonNumber, !season.monitored)
+                                }) {
+                                    Icon(
+                                        if (season.monitored) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                        contentDescription = if (season.monitored) "Unmonitor Season" else "Monitor Season",
+                                        tint = if (season.monitored) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                                    )
+                                }
+                            }
+                        }
                         IconButton(onClick = {
-                            val ids = seasonEpisodes.map { it.id }
-                            viewModel.searchEpisodes(inst, ids)
+                            viewModel.searchSeasonEpisodes(inst, seriesId, seasonNumber)
                         }) {
                             Icon(Icons.Default.Search, contentDescription = "Search Season")
                         }
@@ -355,6 +482,14 @@ fun SeasonDetailScreen(
                                 instance?.let { inst ->
                                     viewModel.searchEpisodes(inst, listOf(episode.id))
                                 }
+                            },
+                            onToggleMonitor = {
+                                instance?.let { inst ->
+                                    viewModel.toggleEpisodeMonitor(inst, episode)
+                                }
+                            },
+                            onInteractiveSearch = {
+                                navController.navigate(Screen.EpisodeReleases.createRoute(episode.id))
                             }
                         )
                         HorizontalDivider()
@@ -366,7 +501,7 @@ fun SeasonDetailScreen(
 }
 
 @Composable
-private fun EpisodeRow(episode: Episode, onSearch: () -> Unit) {
+private fun EpisodeRow(episode: Episode, onSearch: () -> Unit, onToggleMonitor: () -> Unit, onInteractiveSearch: () -> Unit) {
     ListItem(
         headlineContent = {
             Text(
@@ -388,12 +523,25 @@ private fun EpisodeRow(episode: Episode, onSearch: () -> Unit) {
             }
         },
         trailingContent = {
-            if (!episode.hasFile) {
-                IconButton(onClick = onSearch) {
-                    Icon(Icons.Default.Search, contentDescription = "Search", modifier = Modifier.size(20.dp))
+            Row {
+                IconButton(onClick = onToggleMonitor, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        if (episode.monitored) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                        contentDescription = "Toggle Monitor",
+                        tint = if (episode.monitored) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
-            } else {
-                Icon(Icons.Default.CheckCircle, contentDescription = "Downloaded", tint = MaterialTheme.colorScheme.primary)
+                if (!episode.hasFile) {
+                    IconButton(onClick = onSearch, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Search, contentDescription = "Auto Search", modifier = Modifier.size(18.dp))
+                    }
+                    IconButton(onClick = onInteractiveSearch, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.ManageSearch, contentDescription = "Interactive Search", modifier = Modifier.size(18.dp))
+                    }
+                } else {
+                    Icon(Icons.Default.CheckCircle, contentDescription = "Downloaded", tint = MaterialTheme.colorScheme.primary)
+                }
             }
         }
     )

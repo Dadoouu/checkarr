@@ -3,7 +3,7 @@ package com.checkarr.data.models
 import kotlinx.serialization.Serializable
 import java.util.UUID
 
-enum class InstanceType { RADARR, SONARR }
+enum class InstanceType { RADARR, SONARR, PROWLARR }
 
 @Serializable
 data class Instance(

@@ -110,4 +110,68 @@ class SonarrRepository(private val client: ApiClient) {
 
     suspend fun getDiskSpace(instance: Instance): Result<List<DiskSpace>> =
         client.get(instance, "diskspace", ListSerializer(DiskSpace.serializer()))
+
+    suspend fun refreshSeries(instance: Instance, seriesId: Int): Result<Unit> {
+        val body = buildJsonObject {
+            put("name", "RefreshSeries")
+            put("seriesId", seriesId)
+        }.toString()
+        return client.post(instance, "command", body).map {}
+    }
+
+    suspend fun rescanSeries(instance: Instance, seriesId: Int): Result<Unit> {
+        val body = buildJsonObject {
+            put("name", "RescanSeries")
+            put("seriesId", seriesId)
+        }.toString()
+        return client.post(instance, "command", body).map {}
+    }
+
+    suspend fun renameSeries(instance: Instance, seriesId: Int): Result<Unit> {
+        val body = buildJsonObject {
+            put("name", "RenameSeries")
+            put("seriesIds", kotlinx.serialization.json.buildJsonArray { add(JsonPrimitive(seriesId)) })
+        }.toString()
+        return client.post(instance, "command", body).map {}
+    }
+
+    suspend fun monitorSeason(instance: Instance, series: Series, seasonNumber: Int, monitored: Boolean): Result<Series> {
+        val updatedSeasons = series.seasons.map { s ->
+            if (s.seasonNumber == seasonNumber) s.copy(monitored = monitored) else s
+        }
+        val updated = series.copy(seasons = updatedSeasons)
+        val body = json.encodeToString(Series.serializer(), updated)
+        val result = client.put(instance, "series/${series.id}", body)
+        return result.mapCatching { json.decodeFromString(Series.serializer(), it) }
+    }
+
+    suspend fun toggleEpisodeMonitor(instance: Instance, episode: Episode): Result<Episode> {
+        val updated = episode.copy(monitored = !episode.monitored)
+        val body = json.encodeToString(Episode.serializer(), updated)
+        val result = client.put(instance, "episode/${episode.id}", body)
+        return result.mapCatching { json.decodeFromString(Episode.serializer(), it) }
+    }
+
+    suspend fun getEpisodeReleases(instance: Instance, episodeId: Int): Result<List<MovieRelease>> =
+        client.get(instance, "release?episodeId=$episodeId", ListSerializer(MovieRelease.serializer()))
+
+    suspend fun downloadEpisodeRelease(instance: Instance, guid: String, indexerId: Int): Result<Unit> {
+        val body = buildJsonObject {
+            put("guid", guid)
+            put("indexerId", indexerId)
+        }.toString()
+        return client.post(instance, "release", body).map {}
+    }
+
+    suspend fun searchSeasonEpisodes(instance: Instance, seriesId: Int, seasonNumber: Int): Result<Unit> {
+        val body = buildJsonObject {
+            put("name", "SeasonSearch")
+            put("seriesId", seriesId)
+            put("seasonNumber", seasonNumber)
+        }.toString()
+        return client.post(instance, "command", body).map {}
+    }
+
+    suspend fun getEpisodeById(instance: Instance, episodeId: Int): Result<Episode> =
+        client.get(instance, "episode/$episodeId", Episode.serializer())
 }

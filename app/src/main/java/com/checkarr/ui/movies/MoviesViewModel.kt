@@ -178,6 +178,58 @@ class MoviesViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun refreshMovie(instance: Instance, movieId: Int) {
+        viewModelScope.launch {
+            repo.refreshMovie(instance, movieId).fold(
+                onSuccess = { _toast.value = "Refresh started" },
+                onFailure = { _error.value = it.message }
+            )
+        }
+    }
+
+    fun rescanMovie(instance: Instance, movieId: Int) {
+        viewModelScope.launch {
+            repo.rescanMovie(instance, movieId).fold(
+                onSuccess = { _toast.value = "Rescan started" },
+                onFailure = { _error.value = it.message }
+            )
+        }
+    }
+
+    fun renameMovieFiles(instance: Instance, movieId: Int) {
+        viewModelScope.launch {
+            repo.renameMovieFiles(instance, movieId).fold(
+                onSuccess = { _toast.value = "Rename started" },
+                onFailure = { _error.value = it.message }
+            )
+        }
+    }
+
+    fun editMovie(instance: Instance, movie: Movie, qualityProfileId: Int, rootFolderPath: String, monitored: Boolean, minimumAvailability: String) {
+        viewModelScope.launch {
+            val updated = movie.copy(qualityProfileId = qualityProfileId, rootFolderPath = rootFolderPath, monitored = monitored, minimumAvailability = minimumAvailability)
+            repo.updateMovie(instance, updated).fold(
+                onSuccess = {
+                    val list = _movies.value.toMutableList()
+                    val idx = list.indexOfFirst { m -> m.id == movie.id }
+                    if (idx >= 0) list[idx] = it
+                    _movies.value = list
+                    _toast.value = "Movie updated"
+                },
+                onFailure = { _error.value = it.message }
+            )
+        }
+    }
+
+    fun deleteMovieFile(instance: Instance, fileId: Int) {
+        viewModelScope.launch {
+            repo.deleteMovieFile(instance, fileId).fold(
+                onSuccess = { _toast.value = "File deleted" },
+                onFailure = { _error.value = it.message }
+            )
+        }
+    }
+
     fun setSearch(query: String) { _searchQuery.value = query }
     fun setSort(sort: MovieSortOption) {
         if (_sortOption.value == sort) _sortAscending.value = !_sortAscending.value

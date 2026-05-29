@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -264,4 +265,17 @@ fun NoInstanceConfigured(type: String, onNavigateToSettings: () -> Unit) {
             }
         }
     )
+}
+
+@Composable
+fun UnconfiguredState(serviceName: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Icon(icon, null, tint = color, modifier = Modifier.size(56.dp))
+            Text(serviceName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("Configure $serviceName in Settings to use this feature.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
 }

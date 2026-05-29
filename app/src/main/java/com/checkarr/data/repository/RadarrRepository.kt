@@ -97,4 +97,38 @@ class RadarrRepository(private val client: ApiClient) {
 
     suspend fun getDiskSpace(instance: Instance): Result<List<DiskSpace>> =
         client.get(instance, "diskspace", ListSerializer(DiskSpace.serializer()))
+
+    suspend fun refreshMovie(instance: Instance, movieId: Int): Result<Unit> {
+        val body = buildJsonObject {
+            put("name", "RefreshMovie")
+            put("movieIds", kotlinx.serialization.json.buildJsonArray { add(JsonPrimitive(movieId)) })
+        }.toString()
+        return client.post(instance, "command", body).map {}
+    }
+
+    suspend fun rescanMovie(instance: Instance, movieId: Int): Result<Unit> {
+        val body = buildJsonObject {
+            put("name", "RescanMovie")
+            put("movieIds", kotlinx.serialization.json.buildJsonArray { add(JsonPrimitive(movieId)) })
+        }.toString()
+        return client.post(instance, "command", body).map {}
+    }
+
+    suspend fun renameMovieFiles(instance: Instance, movieId: Int): Result<Unit> {
+        val body = buildJsonObject {
+            put("name", "RenameFiles")
+            put("movieId", movieId)
+        }.toString()
+        return client.post(instance, "command", body).map {}
+    }
+
+    suspend fun deleteMovieFile(instance: Instance, fileId: Int): Result<Unit> =
+        client.delete(instance, "moviefile/$fileId")
+
+    suspend fun unmonitorAndDeleteFile(instance: Instance, movie: Movie): Result<Movie> {
+        val updated = movie.copy(monitored = false)
+        val body = json.encodeToString(Movie.serializer(), updated)
+        val result = client.put(instance, "movie/${movie.id}", body)
+        return result.mapCatching { json.decodeFromString(Movie.serializer(), it) }
+    }
 }
